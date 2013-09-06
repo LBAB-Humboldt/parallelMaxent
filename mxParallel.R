@@ -30,11 +30,11 @@ mxParallel<-function(){
   
   countOccs<-countUnique(occs,maskRaster)
   
-  exclSp<-names(which(countOccs < 10))
-  dlgMessage(paste0("Eliminating ", length(exclSp)," species with < 10 unique records out of ",
-                    length(countOccs), " species"),type = "ok")
+  #exclSp<-names(which(countOccs < 10))
+  #dlgMessage(paste0("Eliminating ", length(exclSp)," species with < 10 unique records out of ",
+                    #length(countOccs), " species"),type = "ok")
   
-  occs <- occs[-(unlist(sapply(exclSp,function(x) which(x==occs[,1])))),]
+  #occs <- occs[-(unlist(sapply(exclSp,function(x) which(x==occs[,1])))),]
   
   #Select species to model
   spList=dlgList(sort(unique(occs[,1])),multiple=TRUE)$res
@@ -128,15 +128,21 @@ mxParallel<-function(){
   sfClusterSetupRNG()
   
   #Run MAXENT models in parallel
-  
+
   beg<-seq(1,length(spList),by=nCPU)
   if(length(spList)<nCPU){
     fin<-length(spList)
   } else {
     fin<-seq(nCPU,length(spList),by=nCPU)
-    if (length(beg)!=length(fin)) fin<-c(fin,beg[length(beg)])
+    if (length(beg)!=length(fin)){
+      fin<-c(fin,beg[length(beg)])
+    }
+    fin[length(fin)]<-length(spList)
   }
-
+  
+  
+  
+  
   for (iter in 1:length(beg)){
     print(iter)
     maxent.pc=sfLapply(beg[iter]:fin[iter],function(j){
