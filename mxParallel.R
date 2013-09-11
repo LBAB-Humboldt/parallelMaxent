@@ -134,7 +134,10 @@ mxParallel<-function(){
     fin<-length(spList)
   } else {
     fin<-seq(nCPU,length(spList),by=nCPU)
-    if (length(beg)!=length(fin)) fin<-c(fin,beg[length(beg)])
+    if (length(beg)!=length(fin)){
+      fin<-c(fin,beg[length(beg)])
+    }
+    fin[length(fin)]<-length(spList)
   }
 
   for (iter in 1:length(beg)){
