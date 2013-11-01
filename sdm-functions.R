@@ -54,7 +54,7 @@ mxPredict<-function(predictors,thresholds=NULL,choiceThres,doCut=FALSE,doWrite1=
                     spPoints,filePath,rootname){
   load(filePath)
   map<-predict(mxnt.obj,predictors,args=c("outputformat=logistic"),progress="text") #Argumentos features
-  writeRaster(map,rootname,format="raster",overwrite=TRUE)
+  writeRaster(map,rootname,format="GTiff",overwrite=TRUE,NAflag=-9999)
   if(thresholds){#Use all default maxent thresholds
     tnames_long<-c("Minimum.training.presence.logistic.threshold",
                    "X10.percentile.training.presence.logistic.threshold",
@@ -75,7 +75,7 @@ mxPredict<-function(predictors,thresholds=NULL,choiceThres,doCut=FALSE,doWrite1=
     for(i in 1:length(thresholds)){
       outname<-paste("map_",tnames[i],sep="")
       assign(outname,(map>=thresholds[i]))
-      if(doWrite1) writeRaster(get(outname),paste(rootname,tnames[i],sep="_"),format="raster",overwrite=TRUE)
+      if(doWrite1) writeRaster(get(outname),paste(rootname,tnames[i],sep="_"),format="GTiff",overwrite=TRUE,NAflag=-9999)
     }
     
     #Cut models by patches with records
@@ -95,7 +95,7 @@ cutModel<-function(map,spPoints,doWrite=FALSE,filename){
   pts_patch<-unique(pts_patch)
   pts_patch<-pts_patch[which(!is.na(pts_patch))]
   map_cut<-map_patch %in% pts_patch
-  if(doWrite) writeRaster(map_cut,filename,format="raster",overwrite=TRUE)
+  if(doWrite) writeRaster(map_cut,filename,format="GTiff",overwrite=TRUE,NAflag=-9999)
 }
 
 countUnique<-function(occData,maskRaster){
