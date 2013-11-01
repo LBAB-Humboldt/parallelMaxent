@@ -180,5 +180,3 @@ mxParallel<-function(){
               modelEval=selEval,modelCut=selCut,areaOfInterest=aoi,aoiShape=shapeFile,
               backgroundMethod=bkgMethod,bkgSampleFile=samples))
 }
-
-1 
