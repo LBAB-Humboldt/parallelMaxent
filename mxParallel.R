@@ -30,11 +30,11 @@ mxParallel<-function(){
   
   countOccs<-countUnique(occs,maskRaster)
   
-  exclSp<-names(which(countOccs < 10))
-  dlgMessage(paste0("Eliminating ", length(exclSp)," species with < 10 unique records out of ",
-                    length(countOccs), " species"),type = "ok")
+  #exclSp<-names(which(countOccs < 10))
+  #dlgMessage(paste0("Eliminating ", length(exclSp)," species with < 10 unique records out of ",
+  #                  length(countOccs), " species"),type = "ok")
   
-  occs <- occs[-(unlist(sapply(exclSp,function(x) which(x==occs[,1])))),]
+  #occs <- occs[-(unlist(sapply(exclSp,function(x) which(x==occs[,1])))),]
   
   #Select species to model
   spList=dlgList(sort(unique(occs[,1])),multiple=TRUE)$res
@@ -101,14 +101,17 @@ mxParallel<-function(){
   #Choose samples file if samples are defined by a file
   samples=NULL
   if(bkgMethod=="Samples"){
-    samples=read.csv(dlgOpen(title = "Select CSV samples file", filters = "*.csv")$res,h=T)
+    samples=read.csv(dlgOpen(title = "Select CSV samples file without duplicates", filters = "*.csv")$res,h=T)
   }
+  
+  nBkg<- as.numeric(dlgInput(message = "How many background points?")$res) #Para un computador con 4 cores
+
   
   #Get environmental data only if random background
   if(aoi=="Raster Extent"){
     occCovs_ran<-extract(envVars,occs[,2:3]) #Extract all environmental info
     if(bkgMethod=="Random"){
-      bg_ran_xy<-randomPoints(maskRaster,10000,p=cbind(occs[,2],occs[,3])) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
+      bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occs[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
       bg_ran_covs<-extract(envVars,bg_ran_xy)#Extract background covariates
     } else {
       bg_ran_covs<-na.omit(extract(envVars,samples))#Extract background covariates
@@ -117,7 +120,7 @@ mxParallel<-function(){
   
   #Correr funciones de maxent en paralelo
   
-  nCPU=8 #Para un computador con 4 cores
+  nCPU=as.numeric(dlgInput(message = "How many cores do you wish to use?")$res) #Para un computador con 4 cores
   sfInit(parallel=T,cpus=nCPU)#Initialize nodes
   sfExportAll() #Export vars to all the nodes
   sfLibrary(dismo)
@@ -129,20 +132,7 @@ mxParallel<-function(){
   
   #Run MAXENT models in parallel
   
-  beg<-seq(1,length(spList),by=nCPU)
-  if(length(spList)<nCPU){
-    fin<-length(spList)
-  } else {
-    fin<-seq(nCPU,length(spList),by=nCPU)
-    if (length(beg)!=length(fin)){
-      fin<-c(fin,beg[length(beg)])
-    }
-    fin[length(fin)]<-length(spList)
-  }
-
-  for (iter in 1:length(beg)){
-    print(iter)
-    maxent.pc=sfLapply(beg[iter]:fin[iter],function(j){
+    maxent.pc=sfClusterApplyLB(1:length(spList),function(j){
       ind<-which(occs[,1]==spList[j])
       
       #Get modeling data for background from the entire study area
@@ -153,11 +143,11 @@ mxParallel<-function(){
       
       #Get modeling data for background from regions defined by a shapefile
       if(aoi=="Regions"){
-        bkg<-createBkg(occ,method="regions",inShape,fieldID,envVars[[1]])
+        bkg<-createBkg(occs[ind,2:3],method="regions",inShape,fieldID,envVars[[1]])
         tmpVars<-stack(bkg,envVars)
         occCovs<-extract(tmpVars,occs[ind,2:3]) #Extract all environmental info
         if(bkgMethod=="Random"){
-          bg_ran_xy<-randomPoints(maskRaster,10000,p=occ[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
+          bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occs[ind,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
           bg_covs<-extract(tmpVars,bg_ran_xy)#Extract background covariates
         } else {
           bg_covs<-na.omit(extract(tmpVars,samples))#Extract background covariates
@@ -169,7 +159,7 @@ mxParallel<-function(){
         tmpVars<-stack(bkg,envVars)
         occCovs<-extract(tmpVars,occs[,2:3]) #Extract all environmental info
         if(bkgMethod=="Random"){
-          bg_ran_xy<-randomPoints(maskRaster,10000,p=occ[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
+          bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occ[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
           bg_covs<-extract(tmpVars,bg_ran_xy)#Extract background covariates
         } else {
           bg_covs<-na.omit(extract(tmpVars,samples))#Extract background covariates
@@ -177,13 +167,13 @@ mxParallel<-function(){
       } 
       
       dir.create(paste(wd,"/core",j,sep=""))
-      
+      occCovs<-unique(occCovs) #Removes duplicate presence points
+      bg_covs<-rbind(occCovs,bg_covs)
       mxModel(occCovs,bg_covs,mxntArgs,paste(wd,"/core",j,sep=""),doSave=TRUE,doEval=selEval,spList[j])
       mxPredict(predictors=envVars,thresholds=TRUE,choiceThres,doCut=selCut,doWrite1=TRUE,doWrite2=TRUE,
                 spPoints=occs[ind,2:3],filePath=paste0(wd,"/core",j,"/",spList[j],".RData"),rootname=paste0(wd,"/",spList[j]))
     })
-  }
-  
+
   sfStop()
   return(list(outputDirectory=wd,rastersPath=ruta,rasters=names(envVars),speciesFile=spFile,
               speciesModeled=spList,features=selFeats,extrapolate=selExtOpts,thresholds=selThres,
@@ -191,3 +181,4 @@ mxParallel<-function(){
               backgroundMethod=bkgMethod,bkgSampleFile=samples))
 }
 
+1 
