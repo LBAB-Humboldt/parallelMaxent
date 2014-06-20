@@ -219,6 +219,3 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   })
   sfStop()
 }
-
-  
- 
