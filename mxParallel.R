@@ -57,29 +57,30 @@
 ###                        following keywords: min, 10p, ess, mss.
 ### do.cut(logical):       Select distribution patches with evidence of occurrence
 ###                        from thresholded distribution models?
-
-                        
-
-MxParallel(occ.file="D:/Projects/acuaticas/experiment/species_db.csv",
-           env.dir="C:/ws2",
-           env.files=c(paste0("bio_",1:19,".tif"),"slope_deg.tif","tri.tif","twi.tif"),
-           wd="~/tmp3",
-           dist=1000,
-           bkg.aoi = "extent",
-           bkg.type="random", 
-           n.bkg = 10000, 
-           sample.bkg = NULL,
-           optimize.lambda=TRUE, 
-           folds=10, 
-           do.eval=TRUE,
-           n.cpu=4,
-           mxnt.args=c("autofeature=FALSE","linear=TRUE","quadratic=TRUE","product=FALSE","hinge=TRUE","threshold=FALSE",
-                       "extrapolate=FALSE","doclamp=TRUE","addsamplestobackground=TRUE"), 
-           do.threshold=TRUE, 
-           raw.threshold=c(0,10,20,30), 
-           do.cut=TRUE)
+# 
+#                         
+# Example:
+#
+# mxParallel(occ.file="D:/Projects/acuaticas/experiment/species_db.csv",
+#            env.dir="C:/ws2",
+#            env.files=c(paste0("bio_",1:19,".tif"),"slope_deg.tif","tri.tif","twi.tif"),
+#            wd="~/tmp3",
+#            dist=1000,
+#            bkg.aoi = "extent",
+#            bkg.type="random", 
+#            n.bkg = 10000, 
+#            sample.bkg = NULL,
+#            optimize.lambda=TRUE, 
+#            folds=10, 
+#            do.eval=TRUE,
+#            n.cpu=4,
+#            mxnt.args=c("autofeature=FALSE","linear=TRUE","quadratic=TRUE","product=FALSE","hinge=TRUE","threshold=FALSE",
+#                        "extrapolate=FALSE","doclamp=TRUE","addsamplestobackground=TRUE"), 
+#            do.threshold=TRUE, 
+#            raw.threshold=c(0,10,20,30), 
+#            do.cut=TRUE)
   
-MxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "extent",
+mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "extent",
                      bkg.type="random", n.bkg = 10000, sample.bkg = NULL,
                      optimize.lambda=FALSE, lambda = 1, folds=5, do.eval=TRUE, n.cpu,
                      mxnt.args, do.threshold=FALSE, raw.threshold, do.cut=FALSE){
