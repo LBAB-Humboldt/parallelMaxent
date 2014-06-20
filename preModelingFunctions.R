@@ -22,8 +22,12 @@ LoadLibraries<-function(memory="2g"){
 }
 
 LoadOccs<-function(occ.file){
-  occs <- read.csv(occ.file,as.is=T)
-  
+  if(is.data.frame(occ.file)){
+    occs <- occ.file
+  } else {
+    occs <- read.csv(occ.file,as.is=T)
+  }
+
   with(occs, if(nrow(occs)==0){
     stop("Occurrence file has 0 rows")
   })
