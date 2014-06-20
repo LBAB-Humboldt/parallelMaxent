@@ -1,184 +1,223 @@
-mxParallel<-function(){
-  source("sdm-functions.R") #Load auxilliary functions
-  pkgs<-c("dismo","maptools","sp","rJava","rgdal","spatstat","reshape2",
-          "SDMTools","snowfall","raster","svDialogs")
-  lapply(pkgs,loadLibraries) #Load required libraries
-  
-  #Determine working directory
-  wd=dlgDir(title="Seleccione carpeta archivos salida")$res
-  
-  #Extract environmental data
-  ruta=dlgDir(title="Seleccione carpeta con variables continuas")$res #Seleccione ruta de variables ambientales
-  envVars<-dlgList(list.files(ruta,pattern="*.asc$"),multiple=TRUE,
-                   title="Seleccione variables continuas")$res
-  
-  envVars<-stack(paste(ruta,envVars,sep="/"))
-  if(projection(envVars)=="NA"){
-    dlgMessage("Undefined environmental variables projection
-               Setting projection to geographic",  type = "ok")
-    projection(envVars)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
-  }
-  
-  #Load species records
-  spFile<-dlgOpen(title = "Select CSV species file", filters = "*.csv")$res
-  occs=read.csv(spFile,h=T)
-  
-  #Count unique records and eliminate species with less than 10 records
-  maskRaster<-calc(envVars, fun=function(x){
-    if(sum(is.na(x))==0){return(1)} 
-    else {return(NA)}})
-  
-  countOccs<-countUnique(occs,maskRaster)
-  
-  #exclSp<-names(which(countOccs < 10))
-  #dlgMessage(paste0("Eliminating ", length(exclSp)," species with < 10 unique records out of ",
-  #                  length(countOccs), " species"),type = "ok")
-  
-  #occs <- occs[-(unlist(sapply(exclSp,function(x) which(x==occs[,1])))),]
-  
-  #Select species to model
-  spList=dlgList(sort(unique(occs[,1])),multiple=TRUE)$res
-  
-  #Feature selection options
-  features=list("autofeature","linear","quadratic","hinge","threshold","product")
-  selFeats<-dlgList(features,multiple=TRUE,title="Select Maxent features")$res
-  logFeats<-!is.na(match(features, selFeats))
-  mxntArgs<-paste(features,as.character(logFeats),sep="=")
-  
-  #Extrapolation options
-  projPred=c("none","extrapolate","doclamp")
-  extOpts=list("extrapolate","doclamp")
-  selExtOpts<-dlgList(projPred,multiple=TRUE,title="Select extrapolation options")$res
-  if(!("none"%in%selExtOpts)){
-    logExtOpts<-!is.na(match(extOpts, selExtOpts))
-    mxntArgs<-c(mxntArgs,paste(extOpts,as.character(logExtOpts),sep="="))
-  } else {
-    mxntArgs<-c(mxntArgs,paste(extOpts,as.character(FALSE),sep="="))
-  }
-  
-  #Threshold options
-  thresOpts<-c("Minimum training presence",
-               "Ten percentile training presence",
-               "Maximum Sensitivity + Specificity",
-               "Equal Sensitivity and Specificity",
-               "Custom percentile(s)")
-  
-  selThres<-dlgList(thresOpts,multiple=TRUE,title="Select threshold(s)")$res
-  if(("Custom percentile(s)" %in% selThres)){
-    choiceThres<-dlgInput(message = "Enter threshold(s) based on percentiles (0-100) from training presence data, separated by commas")$res
-    choiceThres<-as.numeric(strsplit(choiceThres,",")[[1]])
-  } else {
-    choiceThres<-as.character(match(selThres,thresOpts[1:4]))
-  }
-  
-  
-  #Do model evaluations?
-  selEval=dlgMessage("Do model evaluation (will increase computation time)?",  type = c("yesno"))$res
-  selEval <- selEval == "yes"
-  
-  #Cut models by patch rule?
-  selCut <- dlgMessage("Cut models by patch rule?",  type = c("yesno"))$res
-  selCut <- selCut == "yes"
-  
-  #Select area of interest. This will be used for model building
-  shapeFile=NULL
-  aoi<-dlgList(c("Raster Extent","Convex Hull","Regions"),multiple=FALSE,
-               title="Set the area of interest")$res
-  
-  #Choose region file if AOI is defined by a shapefile
-  shapeFile=NULL
-  if(aoi=="Regions"){
-    shapeFile<-dlgOpen(title = "Select AOI polygon", filters = "*.shp")$res
-    inShape<-readShapePoly(shapeFile)
-    fieldID=dlgList(colnames(inShape@data),
-                    multiple=FALSE,title="Select field that defines regions")$res
-  }
-  
-  #Choose background selection method
-  bkgMethod<-dlgList(c("Random","Samples"),multiple=FALSE,
-                     title="Choose background selection method")$res
-  
-  #Choose samples file if samples are defined by a file
-  samples=NULL
-  if(bkgMethod=="Samples"){
-    samples=read.csv(dlgOpen(title = "Select CSV samples file without duplicates", filters = "*.csv")$res,h=T)
-  }
-  
-  nBkg<- as.numeric(dlgInput(message = "How many background points?")$res) #Para un computador con 4 cores
+#MxParallel
+# Prepares data for species distribution modeling in Maxent, and runs
+# distribution models in parallel using Maxent.
+# Arguments:
+## Data input, cleaning and output (mandatory):
+### occ.file(string):  Full path to species occurrence file. 
+###                    Occurrence file must be comma separated and must contain fields
+###                    id, species, lat, lon (lowercase, order not important)
+### env.dir(string):   Path to directory that contains environmental layers
+### env.files(string): File names of environmental layers to be used in distribution models.
+###                    Must contain extension, e.g. bio_1.tif.
+### wd(string):        Path to directory where output files will be saved
+### dist(numeric):     Distance (in meters) within which records are considered duplicates.
+###                    Only one record is kept within dist.Default is 1000.
+##
+## Background generation options:
+### bkg.aoi(string):   Keyword that defines where background will be sampled from. 
+###                      extent (default): background will be sampled from raster extent
+###                      regions: background will be species specific, and it will correspond
+###                               to the polygons of a shapefile that completely contain the
+###                               species records.
+###                      ch: background will be species specific and it will correspond to the
+###                          convex hull of the species' records.
+### bkg.type(string):  Keyword that defines how the background will be sampled from bkg.aoi.
+###                    random (default): background will be sampled randomly from bkg.aoi
+###                    samples: get background samples from a file.
+### Optional arguments:
+###   n.bkg(numeric):           number of background samples. 
+###                             Used when bkg.type="random". Default is 10000.
+###   sample.bkg(string):       Path to comma separated file containing background samples.
+###                             Must include the fields lat and lon (lowercase, order doesn't matter).
+###                             Used only when bkg.type="samples"
+###   regions(SpatialPolygons): SpatialPolygons object with the regions that will be used to
+###                             define species background.
+###                             Used only when bkg.aoi="regions"
+###   field(string):            field (column name) that defines the regions.
+###                             Used only when bkg.aoi="regions"
+###   buffer(numeric):          Buffer in meters to be applied to convex polygons.
+###                             Used only when bkg.aoi="ch".
+## Evaluation and regularization options:
+### optimize.lambda(logical):Optimize regularization value? Default FALSE.
+### lambda(numeric):    Regularization multiplier. Deafault 1.       
+### do.eval(logical):   Do model evaluation? Default TRUE.
+### folds(numeric):     Number of folds for k-fold partitioning used in evaluation 
+###                     and regularization optimization. Default = 10.
+## Modeling options:
+### mxnt.args(vector):  character vector containing arguments to pass to dismos'
+###                     maxent function.
+### n.cpu:               Number of cores to uses for parallel processing
+## Post-processing options:
+### do.threshold(logical): Threshold distribution models?
+### raw.threshold(vector): numeric or character vector. If numeric, this will
+###                        specify the percentiles (from 0 to 100) at which
+###                        models should be thresholded according to the 
+###                        "probability of occurrence" at training sites.
+###                        If character, this should be any combination of the
+###                        following keywords: min, 10p, ess, mss.
+### do.cut(logical):       Select distribution patches with evidence of occurrence
+###                        from thresholded distribution models?
 
+                        
+
+MxParallel(occ.file="D:/Projects/acuaticas/experiment/species_db.csv",
+           env.dir="C:/ws2",
+           env.files=c(paste0("bio_",1:19,".tif"),"slope_deg.tif","tri.tif","twi.tif"),
+           wd="~/tmp3",
+           dist=1000,
+           bkg.aoi = "extent",
+           bkg.type="random", 
+           n.bkg = 10000, 
+           sample.bkg = NULL,
+           optimize.lambda=TRUE, 
+           folds=10, 
+           do.eval=TRUE,
+           n.cpu=4,
+           mxnt.args=c("autofeature=FALSE","linear=TRUE","quadratic=TRUE","product=FALSE","hinge=TRUE","threshold=FALSE",
+                       "extrapolate=FALSE","doclamp=TRUE","addsamplestobackground=TRUE"), 
+           do.threshold=TRUE, 
+           raw.threshold=c(0,10,20,30), 
+           do.cut=TRUE)
   
-  #Get environmental data only if random background
-  if(aoi=="Raster Extent"){
-    occCovs_ran<-extract(envVars,occs[,2:3]) #Extract all environmental info
-    if(bkgMethod=="Random"){
-      bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occs[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
-      bg_ran_covs<-extract(envVars,bg_ran_xy)#Extract background covariates
-    } else {
-      bg_ran_covs<-na.omit(extract(envVars,samples))#Extract background covariates
-    }
+MxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "extent",
+                     bkg.type="random", n.bkg = 10000, sample.bkg = NULL,
+                     optimize.lambda=FALSE, lambda = 1, folds=5, do.eval=TRUE, n.cpu,
+                     mxnt.args, do.threshold=FALSE, raw.threshold, do.cut=FALSE){
+  #Create log file
+  sink(paste0(wd,"/log.txt"))
+  on.exit(sink())
+  
+  #Load Functions
+  source("preModelingFunctions.R")
+  source("evaluationFunctions.R")
+  source("postModelingFunctions.R")
+  LoadLibraries()
+  cat(paste(Sys.time(), "Functions and libraries loaded\n"))
+  
+  #Load and clean data
+  occs <- LoadOccs(occ.file)
+  current.spp <- length(unique(occs$species))
+  current.recs <- nrow(occs)
+  cat(paste(Sys.time(), "Loaded",current.recs,"records corresponding to",
+            current.spp, "species from file", occ.file,"\n"))
+             
+  env.vars <- stack(paste0(env.dir,"/",env.files))
+  cat(paste(Sys.time(), "Loaded environmental layers", paste(as.character(env.files), collapse=","), "from directory", env.dir,"\n"))
+             
+  if(projection(env.vars)=="NA"){
+    cat(paste(Sys.time(), "WARNING: Undefined environmental variables projection\n"))
+    cat(paste(Sys.time(), "WARNING: Setting projection to geographic\n"))
+    projection(env.vars)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
   }
+
+  ## Remove records within radius defined by variable "dist"
+  occs <- ddply(occs,.(species),IdNeighbors,dist=dist)
+  current.spp <- length(unique(occs$species))
+  current.recs <- nrow(occs)
+  cat(paste(Sys.time(), "After removing  points within",dist, "meters of each other, ",
+            current.recs, "records corresponding to", current.spp, "species remain\n"))
   
-  #Correr funciones de maxent en paralelo
+  ## Define list of species with more than 10 records
+  sp.list <- FilterSpeciesByRecords(occs, 10)
+  current.spp <- length(sp.list)
+  cat(paste(Sys.time(), "After removing species with less than 10 unique records",
+            current.spp, "species remain \n"))
   
-  nCPU=as.numeric(dlgInput(message = "How many cores do you wish to use?")$res) #Para un computador con 4 cores
-  sfInit(parallel=T,cpus=nCPU)#Initialize nodes
+  #Extract covariate data for presences (and background if bkg.aoi="extent")
+  occs.covs <- extract(env.vars, cbind(occs$lon,occs$lat))
+  if (bkg.aoi == "extent"){
+    train.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
+    test.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
+    cat(paste(Sys.time(), "Background generated for raster extent using",bkg.type, "sampling \n"))
+  }
+  cat(paste(Sys.time(), "Began parallel loop using", n.cpu, "cores \n"))
+  sink()
+  
+  #Begin modeling loop  
+  sfInit(parallel=T,cpus=n.cpu)#Initialize nodes
   sfExportAll() #Export vars to all the nodes
-  sfLibrary(dismo)
-  sfLibrary(raster)
-  sfLibrary(rJava)
-  sfLibrary(rgdal)
-  sfLibrary(SDMTools)
   sfClusterSetupRNG()
-  
-  #Run MAXENT models in parallel
-  
-    maxent.pc=sfClusterApplyLB(1:length(spList),function(j){
-      ind<-which(occs[,1]==spList[j])
-      
-      #Get modeling data for background from the entire study area
-      if(aoi=="Raster Extent"){
-        occCovs<- occCovs_ran[ind,]#Get occurrence environmental info
-        bg_covs<- bg_ran_covs#Get background covariates
+  sfClusterApplyLB(1:length(sp.list),function(i){
+    sink(paste0(wd,"/log.txt"), append=TRUE)
+    on.exit(sink())
+    LoadLibraries()
+    #Get species data
+    sp.name <- sp.list[i]
+    sp.idx <- which(occs$species == sp.list[i])
+    sp.occs <- occs[sp.idx, ]
+    
+    #Generate covariate data for background (when bkg.type!="extent")
+    if(!exists("train.bkg")&!exists("test.bkg")){
+      train.bkg <- GenerateSpBkg(sp.occs, n.bkg, env.vars, bkg.type, bkg.aoi, 
+                                         regions, field, sample.bkg, buffer)
+      test.bkg <- GenerateSpBkg(sp.occs, n.bkg, env.vars, bkg.type, bkg.aoi, 
+                                 regions, field, sample.bkg, buffer)
+      cat(paste(Sys.time(), "Background generated for species", sp.name, 
+                "using area defined by", bkg.aoi, "and", bkg.type, "sampling \n"))
+    }
+    
+    #Determine lambda value
+    if (optimize.lambda){
+      optim.lambda <- OptimizeLambda(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, 
+                                     mxnt.args, wd, sp.list[i])
+      mxnt.args <- c(mxnt.args, paste0("betamultiplier=", optim.lambda["best.lambda"]))
+      cat(paste(Sys.time(), "Performed regularization optimization for", sp.name, "\n"))
+    } else {
+      if(missing(lambda)){
+        mxnt.args <- c(mxnt.args, paste0("betamultiplier=", 1))
+        cat(paste(Sys.time(), "Used default regularization value of 1 for", sp.name, "\n"))
+      } else {
+        mxnt.args <- c(mxnt.args, paste0("betamultiplier=", lambda))
+        cat(paste(Sys.time(), "Used custom regularization value of", lambda, "for", sp.name,"\n")) 
       }
-      
-      #Get modeling data for background from regions defined by a shapefile
-      if(aoi=="Regions"){
-        bkg<-createBkg(occs[ind,2:3],method="regions",inShape,fieldID,envVars[[1]])
-        tmpVars<-stack(bkg,envVars)
-        occCovs<-extract(tmpVars,occs[ind,2:3]) #Extract all environmental info
-        if(bkgMethod=="Random"){
-          bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occs[ind,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
-          bg_covs<-extract(tmpVars,bg_ran_xy)#Extract background covariates
-        } else {
-          bg_covs<-na.omit(extract(tmpVars,samples))#Extract background covariates
+    }
+    
+    #Do model evaluation
+    if(do.eval){
+      sp.eval <- EvaluatePOModel(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, mxnt.args)
+      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation.csv"), row.names=F)
+      cat(paste(Sys.time(), "Performed model evaluation for", sp.name, "\n")) 
+    }
+    
+    #Start modeling
+    mxnt.obj <- maxent(x=rbind(occs.covs[sp.idx, ], train.bkg), 
+                     p=c(rep(1,length(sp.idx)),rep(0,nrow(train.bkg))),
+                     removeDuplicates=FALSE, args=mxnt.args)
+    save(mxnt.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
+    cat(paste(Sys.time(), "Generated maxent distribution model for", sp.name, "\n"))
+    
+    map <- predict(mxnt.obj, env.vars ,args=c("outputformat=logistic")) 
+    writeRaster(map, paste0(wd, "/", sp.list[i], ".tif"), format="GTiff",
+                overwrite=TRUE, NAflag=-9999)
+    cat(paste(Sys.time(), "Generated prediction of maxent distribution model for", sp.name, "\n"))
+    
+    #Note to self: Other stuff to write? results?
+    
+    #Post-processing: threshold & cut
+    if(do.threshold){
+      thres.maps <- sapply(raw.threshold, FUN=Threshold2, mxnt.obj=mxnt.obj, 
+                                 map=map, sp.occs=cbind(sp.occs$lon,sp.occs$lat))
+      for(j in 1:length(raw.threshold)){
+        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], ".tif"), 
+                    format="GTiff",overwrite=TRUE, NAflag=-9999)
+      }
+      cat(paste(Sys.time(), "Generated thresholded prediction of maxent distribution model
+                using thresholds ", paste(raw.threshold,collapse=", "), "for", sp.name, "\n"))
+      if(do.cut){
+        cut.maps <- sapply(thres.maps, FUN=CutModel2, sp.points=cbind(sp.occs$lon,sp.occs$lat))
+        for(j in 1:length(raw.threshold)){
+          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut.tif"), 
+                      format="GTiff",overwrite=TRUE, NAflag=-9999)
         }
-      } 
-      
-      if(aoi=="Convex Hull"){
-        bkg<-createBkg(occ,method="ch",aoi=envVars[[1]])
-        tmpVars<-stack(bkg,envVars)
-        occCovs<-extract(tmpVars,occs[,2:3]) #Extract all environmental info
-        if(bkgMethod=="Random"){
-          bg_ran_xy<-randomPoints(maskRaster,nBkg,p=occ[,2:3]) #Select background XY that don't fall on sampled cells. Those samples will be added at the modeling step.
-          bg_covs<-extract(tmpVars,bg_ran_xy)#Extract background covariates
-        } else {
-          bg_covs<-na.omit(extract(tmpVars,samples))#Extract background covariates
-        }
-      } 
-      
-      dir.create(paste(wd,"/core",j,sep=""))
-      occCovs<-unique(occCovs) #Removes duplicate presence points
-      bg_covs<-rbind(occCovs,bg_covs)
-      mxModel(occCovs,bg_covs,mxntArgs,paste(wd,"/core",j,sep=""),doSave=TRUE,doEval=selEval,spList[j])
-      mxPredict(predictors=envVars,thresholds=TRUE,choiceThres,doCut=selCut,doWrite1=TRUE,doWrite2=TRUE,
-                spPoints=occs[ind,2:3],filePath=paste0(wd,"/core",j,"/",spList[j],".RData"),rootname=paste0(wd,"/",spList[j]))
-    })
-
+        cat(paste(Sys.time(), "Cut thresholded prediction(s) of maxent distribution model for", sp.name, "\n"))
+      }
+    }
+    
+    #Remove temporary files
+    removeTmpFiles(1)
+  })
   sfStop()
-  return(list(outputDirectory=wd,rastersPath=ruta,rasters=names(envVars),speciesFile=spFile,
-              speciesModeled=spList,features=selFeats,extrapolate=selExtOpts,thresholds=selThres,
-              modelEval=selEval,modelCut=selCut,areaOfInterest=aoi,aoiShape=shapeFile,
-              backgroundMethod=bkgMethod,bkgSampleFile=samples))
 }
 
-1 
+  
+ 
