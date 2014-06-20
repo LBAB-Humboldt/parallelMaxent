@@ -96,11 +96,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   cat(paste(Sys.time(), "Functions and libraries loaded\n"))
   
   #Load and clean data
-  if(is.data.frame(occ.file)){
-    occs <- occ.file
-  } else {
-    occs <- LoadOccs(occ.file)
-  }
+  occs <- LoadOccs(occ.file)
   current.spp <- length(unique(occs$species))
   current.recs <- nrow(occs)
   cat(paste(Sys.time(), "Loaded",current.recs,"records corresponding to",
