@@ -118,19 +118,26 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   cat(paste(Sys.time(), "After removing  points within",dist, "meters of each other, ",
             current.recs, "records corresponding to", current.spp, "species remain\n"))
   
-  ## Define list of species with more than 10 records
-  sp.list <- FilterSpeciesByRecords(occs, 10)
-  current.spp <- length(sp.list)
-  cat(paste(Sys.time(), "After removing species with less than 10 unique records",
-            current.spp, "species remain \n"))
+
   
   #Extract covariate data for presences (and background if bkg.aoi="extent")
   occs.covs <- extract(env.vars, cbind(occs$lon,occs$lat))
+  na.rows <- which(apply(is.na(occs.covs), 1, any))
+  occs.covs <- occs.covs[-na.rows, ]
+  occs <- occs[-na.rows, ]
+  
   if (bkg.aoi == "extent"){
     train.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
     test.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
     cat(paste(Sys.time(), "Background generated for raster extent using",bkg.type, "sampling \n"))
   }
+  
+  ## Define list of species with more than 10 records
+  sp.list <- FilterSpeciesByRecords(occs, 10)
+  current.spp <- length(sp.list)
+  cat(paste(Sys.time(), "After removing species with less than 10 unique records",
+            current.spp, "species remain \n"))
+    
   cat(paste(Sys.time(), "Began parallel loop using", n.cpu, "cores \n"))
   sink()
   
@@ -192,6 +199,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
                 overwrite=TRUE, NAflag=-9999)
     cat(paste(Sys.time(), "Generated prediction of maxent distribution model for", sp.name, "\n"))
     
+    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], ".csv"), row.names=FALSE)
     #Note to self: Other stuff to write? results?
     
     #Post-processing: threshold & cut
