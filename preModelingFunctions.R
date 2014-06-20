@@ -4,20 +4,21 @@
 # for 512 megabytes, "2g" for 2 gigabytes.
 
 LoadLibraries<-function(memory="2g"){
+  options(java.parameters = paste0("-Xmx",memory))
   require("dismo")
   require("maptools")
-  require("sp")
-  options(java.parameters = paste0("-Xmx",memory))
+  require("plyr")
+  require("raster")
+  require("reshape2")
   require("rJava")
   require("rgdal")
   require("rgeos")
-  require("spatstat")
-  require("reshape2")
   require("SDMTools")
+  require("sp")
+  require("spatstat")
   require("snowfall")
-  require("raster")
   require("svDialogs")
-  require("plyr")
+
 }
 
 LoadOccs<-function(occ.file){
@@ -70,6 +71,9 @@ CleanOccs<-function(occs,env.vars,dist){
 }
 
 IdNeighbors<-function(occs,dist,longlat=TRUE){
+  if(nrow(occs)<2){
+    return(occs)
+  }
   coords <- cbind(occs$lon,occs$lat)
   dst <- pointDistance(coords,longlat=longlat)
   diag(dst) <- NA
