@@ -17,8 +17,6 @@ LoadLibraries<-function(memory="2g"){
   require("sp")
   require("spatstat")
   require("snowfall")
-  require("svDialogs")
-
 }
 
 LoadOccs<-function(occ.file){

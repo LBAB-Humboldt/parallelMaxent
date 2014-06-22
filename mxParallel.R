@@ -223,7 +223,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     }
     
     #Remove temporary files
-    removeTmpFiles(1)
+    removeTmpFiles(5)
   })
   sfStop()
 }
