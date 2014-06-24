@@ -146,6 +146,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   sfExportAll() #Export vars to all the nodes
   sfClusterSetupRNG()
   sfClusterApplyLB(1:length(sp.list),function(i){
+    tmp.dir <- tempdir()
     sink(paste0(wd,"/log.txt"), append=TRUE)
     on.exit(sink())
     LoadLibraries()
@@ -167,7 +168,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     #Determine lambda value
     if (optimize.lambda){
       optim.lambda <- OptimizeLambda(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, 
-                                     mxnt.args, wd, sp.list[i])
+                                     mxnt.args, wd, sp.list[i], path=tmp.dir)
       mxnt.args <- c(mxnt.args, paste0("betamultiplier=", optim.lambda["best.lambda"]))
       cat(paste(Sys.time(), "Performed regularization optimization for", sp.name, "\n"))
     } else {
@@ -182,7 +183,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     
     #Do model evaluation
     if(do.eval){
-      sp.eval <- EvaluatePOModel(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, mxnt.args)
+      sp.eval <- EvaluatePOModel(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, mxnt.args, path=tmp.dir)
       write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation.csv"), row.names=F)
       cat(paste(Sys.time(), "Performed model evaluation for", sp.name, "\n")) 
     }
@@ -190,7 +191,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     #Start modeling
     mxnt.obj <- maxent(x=rbind(occs.covs[sp.idx, ], train.bkg), 
                      p=c(rep(1,length(sp.idx)),rep(0,nrow(train.bkg))),
-                     removeDuplicates=FALSE, args=mxnt.args)
+                     removeDuplicates=FALSE, args=mxnt.args, path=tmp.dir)
     save(mxnt.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
     cat(paste(Sys.time(), "Generated maxent distribution model for", sp.name, "\n"))
     
@@ -223,7 +224,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     }
     
     #Remove temporary files
-    removeTmpFiles(5)
+    removeTmpFiles(2)
   })
   sfStop()
 }

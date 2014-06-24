@@ -1,6 +1,6 @@
 #This uses k-fold partitioning to divide up the presences, and uses a train and test
 #background/pseudoabsence without partitioning.
-EvaluatePOModel <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args){
+EvaluatePOModel <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args, path){
   results<-data.frame(n.train=rep(0,folds), n.test=0, nparams=0, train.auc=0,
                       test.auc=0, stringsAsFactors=FALSE)
   kvector <- kfold(covs.pres, folds)
@@ -12,7 +12,7 @@ EvaluatePOModel <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxn
     test.df <- rbind(covs.pres[kvector==k, ], covs.bkg.test)
     y.train <- c(rep(1, n.train),rep(0,nrow(covs.bkg.train)))
     y.test <- c(rep(1, n.test),rep(0,nrow(covs.bkg.test)))
-    mxnt.obj <- maxent(x=train.df, p=y.train, removeDuplicates=FALSE, args=mxnt.args)
+    mxnt.obj <- maxent(x=train.df, p=y.train, removeDuplicates=FALSE, args=mxnt.args, path=path)
     pocc.train <- predict(mxnt.obj, train.df)
     pocc.test <- predict(mxnt.obj, test.df)
     auc.train <- evaluate(pocc.train[y.train==1], pocc.train[y.train==0])@auc
@@ -37,13 +37,13 @@ getLambdaTable<-function(lambdas){
 }
 
 
-OptimizeLambda <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args, wd=getwd(), sp.prefix="species"){
+OptimizeLambda <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args, wd=getwd(), sp.prefix="species", path){
   lambda.vector <- c(0.02,0.05,0.1,0.22,0.46,1,2.2,4.6)
   results <-data.frame()
   for(lambda in lambda.vector){
     mxnt.args <- c(mxnt.args,paste0("betamultiplier=",lambda))
     results <- rbind(results, 
-                     EvaluatePOModel(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args))
+                     EvaluatePOModel(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt.args,path=path))
   }
   results <- cbind(lambda=rep(lambda.vector,each=folds), results)
   write.csv(results, paste0(wd, "/", sp.prefix, "_lambda.optimization.csv"), row.names=FALSE)
