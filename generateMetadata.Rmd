@@ -1,0 +1,101 @@
+```{r,echo=FALSE}
+tnames_long <- c("Minimum.training.presence.logistic.threshold","X10.percentile.training.presence.logistic.threshold","Equal.training.sensitivity.and.specificity.logistic.threshold","Maximum.training.sensitivity.plus.specificity.logistic.threshold")
+spName = "Actitis_macularius"
+spName2 = gsub("_"," ",spName)
+df = read.csv(paste0("G:/Acuaticas/Modelos4/",spName,".csv"))
+load(paste0("G:/Acuaticas/Modelos4/",spName,".RData"))
+source("~/GitHub/parallelMaxent/evaluationFunctions.R")
+library(plyr)
+results<-read.csv(paste0("G:/Acuaticas/Modelos4/",spName,"_lambda.optimization.csv"))
+optim.lambda<-FindBestLambda(results)
+```
+Modelo de distribución de *`r spName2`*
+========================================================
+
+Fuentes de datos de distribución
+--------------------------------------------------------
+GBIF (http://data.gbif.org):                `r sum(substr(df$id,1,4)=="GBIF")` registros.  
+SIB Colombia (http://data.sibcolombia.net): `r sum(substr(df$id,1,4)=="SiB_")` registros.  
+DATAcuaticas - Calidris - **Privado**:          `r sum(substr(df$id,1,4)=="DATA")` registros.  
+eBird (http://ebird.org):                   `r sum(substr(df$id,1,4)=="eBir")` registros.  
+xeno-canto (http://www.xeno-canto.org/):    `r sum(substr(df$id,1,4)=="Xeno")` registros.  
+VertNet (http://portal.vertnet.org/):       `r sum(substr(df$id,1,4)=="Vern")` registros.   
+Proyecto Libro Rojo - **Privado**:              `r sum(substr(df$id,1,4)=="libro")` registros.  
+
+Total registros únicos:  `r nrow(df)`  
+
+Datos ambientales
+--------------------------------------------------------
+**Tomados de [WorldClim](http://worldclim.org)**
+
+BIO1 = Temperatura media anual  
+BIO2 = Rango de temperatura diurna promedio anual  
+BIO3 = Isotermalidad (BIO2/BIO7 * 100)  
+BIO4 = Estacionalidad de la temperatura (desviación estandard * 100)  
+BIO5 = Máxima temperatura del mes más cálido  
+BIO6 = Mínima temperatura del mes más frío  
+BIO7 = Rango de temperatura anual (BIO5-BIO6)  
+BIO8 = Temperatura promedio del trimestre más húmedo  
+BIO9 = Temperatura promedio del trimestre más seco  
+BIO10 = Temperatura promedio del trimestre más cálido  
+BIO11 = Temperatura promedio del trimestre más frío  
+BIO12 = Precipitación anual  
+BIO13 = Precipitación del mes más húmedo  
+BIO14 = Precipitación del mes más seco  
+BIO15 = Estacionalidad de la precipitación (coeficiente de variación)  
+BIO16 = Precipitación del trimestre más húmedo  
+BIO17 = Precipitación del trimestre más seco  
+BIO18 = Precipitación del trimestre más cálido  
+BIO19 = Precipitación del trimestre más frío      
+  
+**Derivadas de [Hydrosheds] (http://hydrosheds.cr.usgs.gov/dataavail.php)**  
+**Sólo usadas en modelos tipo 2 para organismos acuáticos**  
+
+Pendiente  
+Índice de humedad topográfica  
+Índice de desigualdad topográfica  
+
+**Número promedio de parametros usados en el modelo (contando transformaciones de datos) : `r optim.lambda["best.nparams"]`**
+
+Parámetros de modelamiento
+--------------------------------------------------------
+Método de modelamiento: MAXENT 3.3.3k (Phillips et al. 2006)
+Background: 10000 puntos aleatorios.  
+
+### Configuración  
+Linear = TRUE  
+Quadratic = TRUE  
+Hinge = TRUE  
+Product = FALSE  
+Threshold = FALSE  
+Auto = FALSE  
+Extrapolate = FALSE  
+Clamp = TRUE  
+betamultiplier = `r optim.lambda["best.lambda"]`
+
+Créditos
+--------------------------------------------------------
+**Instituciones publicadoras de datos:** `r paste(sort(unique(df$Institucion)),collapse=", ")`  
+
+**Colectores/Observadores:** `r paste(sort(unique(df$Colector)),collapse=", ")`  
+
+Modelo desarrollado por:  
+> Jorge Velásquez-Tibatá  
+> Laboratorio de Biogeografía Aplicada y Bioacústica (LBAB)  
+> Instituto Alexander von Humboldt  
+> Bogotá, Colombia  
+> (jvelasquez@humboldt.org.co)  
+
+Fecha desarrollo:	2013-06-20
+
+Cómo citar un modelo:	
+
+> Laboratorio de Biogeografía Aplicada y Bioacústica. 2013. Modelo de distribución de *`r spName2`*. Instituto Alexander von Humboldt. http://biomodelos.humboldt.org.co.
+ 
+Cómo citar un conjunto de modelos:	
+
+> Laboratorio de Biogeografía Aplicada y Bioacústica. 2013. Biomodelos. Instituto Alexander von Humboldt. http://biomodelos.humboldt.org.co.
+
+Contacto:
+> Maria C. Londoño
+> mlondono@humboldt.org.co
