@@ -53,13 +53,19 @@ OptimizeLambda <- function(folds, covs.pres, covs.bkg.train, covs.bkg.test, mxnt
 
 FindBestLambda<-function(df){
   summary.df <- ddply(df, "lambda", summarise, mean.auc=mean(test.auc),
-                      median.auc=median(test.auc),mean.nparams=mean(nparams))
+                      median.auc=median(test.auc, na.rm=TRUE),mean.nparams=mean(nparams))
   best.lambda <- summary.df$lambda[which.max(summary.df$median.auc)]
   optimum.lambda <- NA
   opt.idx <- NA
   start.idx <- which.max(summary.df$median.auc) + 1
   if(start.idx > nrow(summary.df)){
-    return(best.lambda)
+    result=c(best.lambda = best.lambda, 
+             best.nparams = summary.df$mean.nparams[(start.idx-1)],
+             best.median.auc = max(summary.df$median.auc),
+             optimum.lambda = NA,
+             optimum.nparams = NA,
+             optimum.median.auc = NA)
+    return(result)
   }
   for(i in start.idx:nrow(summary.df)){
     pval <- with(df,
