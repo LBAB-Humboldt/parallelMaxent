@@ -122,9 +122,9 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   
   #Extract covariate data for presences (and background if bkg.aoi="extent")
   occs.covs <- extract(env.vars, cbind(occs$lon,occs$lat))
-  na.rows <- which(apply(is.na(occs.covs), 1, any))
-  occs.covs <- occs.covs[-na.rows, ]
-  occs <- occs[-na.rows, ]
+  nna.rows <- which(apply(!is.na(occs.covs), 1, any))
+  occs.covs <- occs.covs[nna.rows, ]
+  occs <- occs[nna.rows, ]
   
   if (bkg.aoi == "extent"){
     train.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
@@ -134,6 +134,9 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   
   ## Define list of species with more than 10 records
   sp.list <- FilterSpeciesByRecords(occs, 10)
+  if(length(sp.list)==0){
+    return()
+  }
   current.spp <- length(sp.list)
   cat(paste(Sys.time(), "After removing species with less than 10 unique records",
             current.spp, "species remain \n"))
