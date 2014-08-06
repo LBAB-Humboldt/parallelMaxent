@@ -3,8 +3,9 @@
 # memory: string specifying how much memmory allocate to rJava, e.g. "512m"
 # for 512 megabytes, "2g" for 2 gigabytes.
 
-LoadLibraries<-function(memory="2g"){
+LoadLibraries<-function(memory="4g"){
   options(java.parameters = paste0("-Xmx",memory))
+  require("devtools")
   require("dismo")
   require("maptools")
   require("plyr")
