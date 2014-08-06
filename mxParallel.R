@@ -105,7 +105,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   env.vars <- stack(paste0(env.dir,"/",env.files))
   cat(paste(Sys.time(), "Loaded environmental layers", paste(as.character(env.files), collapse=","), "from directory", env.dir,"\n"))
              
-  if(projection(env.vars)=="NA"){
+  if(is.na(projection(env.vars))){
     cat(paste(Sys.time(), "WARNING: Undefined environmental variables projection\n"))
     cat(paste(Sys.time(), "WARNING: Setting projection to geographic\n"))
     projection(env.vars)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
