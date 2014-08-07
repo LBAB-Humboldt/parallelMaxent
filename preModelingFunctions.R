@@ -18,6 +18,7 @@ LoadLibraries<-function(memory="4g"){
   require("sp")
   require("spatstat")
   require("snowfall")
+  require("rlecuyer")
 }
 
 LoadOccs<-function(occ.file){
