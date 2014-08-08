@@ -175,7 +175,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
       mxnt.args <- c(mxnt.args, paste0("betamultiplier=", optim.lambda["best.lambda"]))
       cat(paste(Sys.time(), "Performed regularization optimization for", sp.name, "\n"))
     } else {
-      if(missing(lambda)){
+      if(exists("lambda")){
         mxnt.args <- c(mxnt.args, paste0("betamultiplier=", 1))
         cat(paste(Sys.time(), "Used default regularization value of 1 for", sp.name, "\n"))
       } else {
