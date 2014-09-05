@@ -1,69 +1,79 @@
 #convert2PNG.R
 #
-#Converts all the tif files in a folder to KMZ and PNG
-#as long as their filename matches any of the strings in the argument include. The color
-#scheme is thought only for the binary color scheme used in BioModelos.
+#This function creates a KMZ file, georeferenced PNG and a thumb PNG for any given tif file.
+#Projection, extent and color scheme have been optimized for BioModelos
+#This function can be wrapped in a for loop or apply (sapply or sfClusterApplyLB) to
+#convert all tif files on a list. See example below
 #
 #Args:
-# inFolder = folder that contains .tif files to convert
-# files2process = character vector with the filenames of files to process
-
+# sp.raster = character string with tif filename (including extension)
+# in.folder = folder that contains the .tif file to convert
+# fill = color to be used as fill of binary files
+# add.trans = add trasparent color to palette? Usually you would use TRUE when the tif file
+# contains NA, 0 and 1 values, whereas you would use FALSE when the tif only
+# has NA and 1 values.
 #
 #Usage:
-#  inFolder<-"W:/Modelos/20131122"
-#  convert2PNG(inFolder,files2process)
+#   in.folder = "~/Modelos/librorojo2"
+#   fill = rgb(193,140,40,maxColorValue=255)
+#   sp.raster = "Anas_bahamensis_0.tif"
+#   convert2PNG(sp.raster, in.folder, fill, TRUE)
 #
-#Author: Jorge VelÃ¡squez
-#Date: 26-02-2014
+#Example on parallel loop
+# require(snowfall)
+# sfInit(parallel=T,cpus=16)#Initialize nodes
+# sfExportAll() #Export vars to all the nodes
+# sfClusterSetupRNG()
+# sfClusterApplyLB(sp.list, convert2PNG, in.folder=in.folder, fill=fill, add.trans=TRUE)
+# sfStop()
+#
+#Author: Jorge Velásquez
+#Date: 05-09-2014
 
-convert2PNG<-function(inFolder,files2process){
+convert2PNG<-function(sp.raster, in.folder, fill, add.trans){
   require(raster)
   require(sp)
   require(rgdal)
-
-  #Plotting parameters
-  tr=rgb(255,255,255,0,maxColorValue=255)
-  fill=rgb(193,140,40,maxColorValue=255)
   
-  #Create base rasters
-  colombia<-readOGR(dsn="C:/Users/aves/Google Drive H/Google Drive/SDM_BaseFiles/tmp","COL_adm0")
-  thumb_aoi<-readOGR(dsn="C:/Users/aves/Google Drive H/Google Drive/SDM_BaseFiles/tmp","thumbnail_area")
-  dem<-raster("C:/Users/aves/Google Drive H/Google Drive/SDM_BaseFiles/tmp/alt.asc")
-  dem1000_co <- crop((dem > 1000),thumb_aoi)
-  
-    
-  mask.co <- rasterize(colombia,dem1000_co,field=1)
-  dem1000_co <- dem1000_co * mask.co
-  
-  inRaster<-raster(paste0(inFolder,"/",files2process[1])) #Assumes all layers in inFolder have the same extent and res
-  mask.co <- rasterize(colombia,inRaster,field=1)
-  #Create dirs
-  dir.create(paste0(inFolder,"/PNG"),recursive=T)
-  dir.create(paste0(inFolder,"/KMZ"),recursive=T)
-  dir.create(paste0(inFolder,"/thumb"),recursive=T)
-  
-  #Start plotting loop
-  for(j in files2process){
-    #Plots for geovisor
-    inRaster<-raster(paste0(inFolder,"/",j))*1
-    if(is.na(projection(inRaster))){
-      projection(inRaster)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
-    }
-    name=strsplit(j,"[.]")[[1]][1]
-    print(name)
-    KML(inRaster,filename=paste0(inFolder,"/KMZ/",name,".kmz"),
-        maxpixels=ncell(inRaster),col=c(tr,fill),overwrite=T)
-    unzip(paste0(inFolder,"/KMZ/",name,".kmz"),exdir=paste0(inFolder,"/PNG"))
-    file.remove(paste0(inFolder,"/PNG/",name,".kml"))
-    
-    #Generate thumbnails
-    in.raster_co <- crop(inRaster,thumb_aoi)*mask.co
-    png(paste0(inFolder,"/thumb/",name,"_thumb.png"),width=145,height=205,units="px",type="cairo")
-    op <- par(mar = rep(0, 4),bg=NA)
-    image(dem1000_co,axes=F,xlab="",ylab="",col=c(tr,"grey90"))
-    image(in.raster_co,col=c(tr,fill),axes=FALSE,add=T)
-    plot(colombia,add=T,lwd=1,border="grey40",)
-    dev.off()
-    unlink(list.files(tempdir()),recursive=T)
+  #Set transparent color
+  tr <- rgb(255, 255, 255, 0, maxColorValue=255)
+  if(add.trans){
+    col.pal <- c(tr, fill)
+  } else {
+    col.pal <- c(fill)
   }
+  
+  #Load layers
+  if(!file.exists("baseLayers.RData")){
+    download.file("https://github.com/LBAB-Humboldt/parallelMaxent/raw/master/baseLayers.RData",
+                  "baseLayers.RData", method="wget")
+  }
+  load("baseLayers.RData")
+  
+  #Create dirs
+  dir.create(paste0(in.folder,"/PNG"), recursive=T)
+  dir.create(paste0(in.folder,"/KMZ"), recursive=T)
+  dir.create(paste0(in.folder,"/thumb"), recursive=T)
+  
+  #Plots for geovisor
+  in.raster <- raster(paste0(in.folder, "/", sp.raster))
+  if(is.na(projection(in.raster))){
+    projection(inRaster)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
+  }
+  name <- strsplit(sp.raster,"[.]")[[1]][1]
+  KML(in.raster, filename=paste0(in.folder,"/KMZ/",name,".kmz"),
+      maxpixels=ncell(in.raster), col=col.pal, overwrite=T)
+  unzip(paste0(in.folder, "/KMZ/", name, ".kmz"), exdir=paste0(in.folder,"/PNG"))
+  file.remove(paste0(in.folder, "/PNG/", name,".kml"))
+  
+  #Generate thumbnails
+  in.raster.co <- crop(in.raster, thumb.aoi) * mask.co
+  png(paste0(in.folder, "/thumb/", name, "_thumb.png"),
+      width=145, height=205, units="px", type="cairo")
+  op <- par(mar = rep(0, 4), bg=NA)
+  image(dem1000.co, axes=F, xlab="", ylab="", col=c(tr, "grey90"))
+  image(in.raster.co, col=col.pal, axes=FALSE, add=T)
+  plot(colombia, add=T, lwd=1, border="grey40",)
+  dev.off()
+  unlink(list.files(tempdir()),recursive=T)
 }
