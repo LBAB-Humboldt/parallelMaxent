@@ -1,7 +1,12 @@
-#Loads all libraries needed to run script
+#preModelingFunctions.R
+#Set of functions to prepare data and environment to run species distribution models
+#Author: Jorge Velásquez
+
+#LoadLibraries
+#Loads all libraries needed to run functions called by mxParallel
 #Arguments: 
-# memory: string specifying how much memmory allocate to rJava, e.g. "512m"
-# for 512 megabytes, "2g" for 2 gigabytes.
+# memory(string): string specifying how much memmory allocate to rJava, e.g. "512m"
+#  for 512 megabytes, "2g" for 2 gigabytes.
 
 LoadLibraries<-function(memory="4g"){
   options(java.parameters = paste0("-Xmx",memory))
@@ -20,6 +25,13 @@ LoadLibraries<-function(memory="4g"){
   require("snowfall")
   require("rlecuyer")
 }
+
+#LoadOccs
+#Loads and verifies species occurrence file
+##Arguments:
+# occ.file(string): path to comma separated file of occurrences. Must have fields id, species, lon, lat
+##Returns:
+# data frame of occurrences.
 
 LoadOccs<-function(occ.file){
   if(is.data.frame(occ.file)){
@@ -66,13 +78,30 @@ LoadOccs<-function(occ.file){
   return(occs)
 }
 
+#CleanOccs
+#Extracts environmental values associated with occurrences after removing duplicates
+#and eliminating records at a particular distance
+##Arguments:
+##  occs(data frame): data frame object of occurrences
+##  env.vars(raster): raster or stack of environmental variables from which to extract
+##   environmental values. 
+##  dist(numeric): distance below which two coordinates are considered a duplicate.
 
-#Removes duplicates and eliminates records at a particular distance
 CleanOccs<-function(occs,env.vars,dist){
-  occs <- ddply(occs,.(species),IdNeighbors,dist=1000)
+  occs <- ddply(occs,.(species),IdNeighbors,dist=1000) #Apply the IdNeighbors function to each species
   occs.covs <- extract(env.vars, cbind(occs$lon,occs$lat))
   return(list(occs=occs, occs.covs=occs.covs))
 }
+
+#IdNeighbors
+#Identifies records below a specified threshold distance and deletes them from occurrence
+#file.
+#Arguments:
+##  occs(data frame): data frame object of occurrences
+##  dist(numeric): distance below which two coordinates are considered a duplicate.
+##  longlat(logical): Are coordinates geographic?
+#Returns:
+##  data frame object of occurrences without duplicate coordinates.
 
 IdNeighbors<-function(occs,dist,longlat=TRUE){
   if(nrow(occs)<2){
@@ -90,6 +119,14 @@ IdNeighbors<-function(occs,dist,longlat=TRUE){
   }
 }
 
+#FilterSpeciesByRecords
+#Create list of species with more than min.recs records
+#Arguments:
+##  occs(data frame): data frame object of occurrences
+##  min.recs(numeric): minimum number of records to be included in list.
+#Returns:
+##  character vector of species with more than min.recs records
+
 FilterSpeciesByRecords <- function(occs, min.recs){
   df <- ddply(occs,"species",summarise,N=length(species))
   sp.list <- df$species[which(df$N >= min.recs)]
@@ -99,6 +136,20 @@ FilterSpeciesByRecords <- function(occs, min.recs){
     return(sp.list)
   }
 }
+
+#GenerateBkg
+#Generates background to use in species distribution models
+#Arguments:
+##  n (numeric): size of background dataset
+##  env.vars(raster): raster or stack of environmental variables from which background
+##   will be extracted.
+##  bkg.type(string): keyword that defines how the background will be sampled from bkg.aoi.
+##    random (default): background will be sampled randomly from bkg.aoi 
+##    samples: get background samples from a file.
+##  sample.bkg(string): data frame (should better be a csv??) with coordinates lon lat for
+##   each record.Background is defined by this data frame.
+#Returns:
+##  data frame with environmental conditions associated with background.
 
 GenerateBkg <- function(n, env.vars, bkg.type="random", sample.bkg=NULL){
   if(bkg.type == "random"){
@@ -110,6 +161,33 @@ GenerateBkg <- function(n, env.vars, bkg.type="random", sample.bkg=NULL){
   }
   return(as.data.frame(bkg.covs))
 }
+
+#GenerateSpBkg
+#Generates species-specific psudoabsences or background
+#Arguments:
+##  occs(data frame or matrix): 2-column matrix or data frame of species' occurrences.
+##  n(numeric): size of background dataset
+##  env.vars(raster): raster or stack of environmental variables from which background
+##   will be extracted.
+##  bkg.type(string): keyword that defines how the background will be sampled from bkg.aoi.
+##    random (default): background will be sampled randomly from bkg.aoi 
+##    samples: get background samples from a file.
+##  bkg.aoi(string): keyword that defines where background will be sampled from. 
+##    regions: background will be species specific, and it will correspond
+##            to the polygons of a shapefile that completely contain the
+##            species records.
+##    ch: background will be species specific and it will correspond to the
+##       convex hull of the species' records.
+##  regions(SpatialPolygons): SpatialPolygons object with the regions that will be used to
+##                            define species background.
+##  field(string):            field (column name) that defines the regions.
+##                            Used only when bkg.aoi="regions"
+##  sample.bkg(data frame): data frame (should better be a csv??) with coordinates lon lat for
+##              each record.Background is defined by this data frame.
+##  buffer(numeric): Buffer in meters to be applied to convex polygons.
+##                   Used only when bkg.aoi="ch".
+#Returns:
+##  data frame with environmental conditions associated with background.
 
 GenerateSpBkg <- function(occs, n, env.vars, bkg.type="random", bkg.aoi, 
                           regions, field, sample.bkg=NULL, buffer=NULL){
@@ -133,7 +211,22 @@ GenerateSpBkg <- function(occs, n, env.vars, bkg.type="random", bkg.aoi,
   }
   return(list(bkg.aoi=bkg,bkg.covs=as.data.frame(bkg.covs)))
 }
-  
+
+#CreateAOI
+#Create raster of area of interest for modeling
+#Arguments:
+##  occs(matrix or data frame): 2-column matrix or data frame of species' occurrences.
+##  method(string): either regions or ch depending on whether the area of interest is 
+##   defined by the polygons of a shapefile that contain species occurrences or by a
+##   convex hull from occurrences
+##  aoi(raster): a raster object with the extent, resolution and projection of the area of interest.
+##  regions(SpatialPolygons): SpatialPolygons object with the regions that will be used to
+##                            define species background.
+##  field(string): field (column name) that defines the regions.
+##  buffer(numeric): buffer in meters to be applied to convex polygons.
+#Returns:
+# A raster object with area of interest for modeling.
+
 CreateAOI<-function(occs, method, aoi, regions, field, buffer){
   in.pts <- SpatialPoints(cbind(occs$lon, occs$lat), proj4string = CRS(projection(aoi)))
   if(method == "regions"){
@@ -162,6 +255,14 @@ CreateAOI<-function(occs, method, aoi, regions, field, buffer){
     return(bkg)
   }
 }
+
+#sampleRaster
+#Function to sample n points randomly from a raster object
+#Arguments:
+## raster.obj(raster): raster object to sample coordinates pairs from
+## n(numeric): number of coordinate pairs to sample
+#Returns:
+## data frame of sampled coordinates
 
 sampleRaster<-function(raster.obj,n){
   if(nlayers(raster.obj)>1){

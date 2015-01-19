@@ -81,7 +81,7 @@
 #            do.cut=TRUE)
   
 mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "extent",
-                     bkg.type="random", n.bkg = 10000, sample.bkg = NULL,
+                     bkg.type="random", n.bkg = 10000, sample.bkg = NULL,buffer=0,
                      optimize.lambda=FALSE, lambda = 1, folds=5, do.eval=TRUE, n.cpu,
                      mxnt.args, do.threshold=FALSE, raw.threshold, do.cut=FALSE){
   #Create log file
@@ -105,7 +105,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   env.vars <- stack(paste0(env.dir,"/",env.files))
   cat(paste(Sys.time(), "Loaded environmental layers", paste(as.character(env.files), collapse=","), "from directory", env.dir,"\n"))
              
-  if(is.na(projection(env.vars))){
+  if(is.na(projection(env.vars))|projection(env.vars)=="NA"){
     cat(paste(Sys.time(), "WARNING: Undefined environmental variables projection\n"))
     cat(paste(Sys.time(), "WARNING: Setting projection to geographic\n"))
     projection(env.vars)<-"+proj=longlat +ellps=WGS84 +datum=WGS84"
@@ -209,7 +209,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     #Post-processing: threshold & cut
     if(do.threshold){
       thres.maps <- sapply(raw.threshold, FUN=Threshold2, mxnt.obj=mxnt.obj, 
-                                 map=map, sp.occs=cbind(sp.occs$lon,sp.occs$lat))
+                                 map=map)
       for(j in 1:length(raw.threshold)){
         writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], ".tif"), 
                     format="GTiff",overwrite=TRUE, NAflag=-9999)
