@@ -89,6 +89,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   on.exit(sink())
   
   #Load Functions
+  library(devtools)
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/preModelingFunctions.R")
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/evaluationFunctions.R")
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/postModelingFunctions.R")

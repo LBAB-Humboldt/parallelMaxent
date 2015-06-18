@@ -266,12 +266,7 @@ CreateAOI<-function(occs, method, aoi, regions, field, buffer){
 
 sampleRaster<-function(raster.obj,n){
   if(nlayers(raster.obj)>1){
-    mask <- calc(raster.obj, fun=function(x){
-                                if(sum(is.na(x))==0){
-                                  return(1)
-                                } else {
-                                  return(NA)
-                                }})
+    mask <- sum(raster.obj)
     cells <- Which(!is.na(mask),cells=T)
   } else {
     cells <- Which(!is.na(raster.obj),cells=T)
