@@ -180,7 +180,7 @@ bcParallel <- function(occ.file, env.dir, env.files, dist, bkg.aoi, bkg.type,
       thres.maps <- sapply(raw.threshold, FUN=ThresholdBRT, brt.obj=bc.obj, sp.covs=occs.covs[sp.idx, ],
                            map=map)
       for(j in 1:length(raw.threshold)){
-        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], ".tif"), 
+        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], "_bc.tif"), 
                     format="GTiff",overwrite=TRUE, NAflag=-9999)
       }
       cat(paste(Sys.time(), "Generated thresholded prediction of Bioclim distribution model
@@ -188,7 +188,7 @@ bcParallel <- function(occ.file, env.dir, env.files, dist, bkg.aoi, bkg.type,
       if(do.cut){
         cut.maps <- sapply(thres.maps, FUN=CutModel2, sp.points=cbind(sp.occs$lon,sp.occs$lat))
         for(j in 1:length(raw.threshold)){
-          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut.tif"), 
+          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut_bc.tif"), 
                       format="GTiff",overwrite=TRUE, NAflag=-9999)
         }
         cat(paste(Sys.time(), "Cut thresholded prediction(s) of Bioclim distribution model for", sp.name, "\n"))
