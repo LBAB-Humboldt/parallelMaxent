@@ -103,7 +103,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   cat(paste(Sys.time(), "Loaded",current.recs,"records corresponding to",
             current.spp, "species from file", occ.file,"\n"))
              
-  env.vars <- stack(paste0(env.dir,"/",env.files))
+  env.vars <- raster:::stack(paste0(env.dir,"/",env.files))
   cat(paste(Sys.time(), "Loaded environmental layers", paste(as.character(env.files), collapse=","), "from directory", env.dir,"\n"))
              
   if(is.na(projection(env.vars))|projection(env.vars)=="NA"){
@@ -134,7 +134,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   }
   
   ## Define list of species with more than 10 records
-  sp.list <- FilterSpeciesByRecords(occs, 10)
+  sp.list <- FilterSpeciesByRecords(occs, 5)
   if(length(sp.list)==0){
     return()
   }
