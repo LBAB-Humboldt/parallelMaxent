@@ -198,4 +198,5 @@ bcParallel <- function(occ.file, env.dir, env.files, dist, bkg.aoi, bkg.type,
     #Remove temporary files
     removeTmpFiles(2)
   })
+  sfStop()
 }
