@@ -7,8 +7,6 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
 
   #Load Functions
   library(devtools)
-  source("C:/Users/GIC 14/Documents/GitHub/parallelMaxent/ThresholdBRT.R")
-  source("C:/Users/GIC 14/Documents/GitHub/parallelMaxent/EvaluateBRTModel.R")
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/preModelingFunctions.R")
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/evaluationFunctions.R")
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/postModelingFunctions.R")
