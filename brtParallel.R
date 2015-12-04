@@ -1,10 +1,10 @@
 
 brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
-         n.bkg,sample.bkg,wd,folds,do.threshold,raw.threshold,do.cut,brt.params,n.cpu,do.eval){
+                      n.bkg,sample.bkg,wd,folds,do.threshold,raw.threshold,do.cut,brt.params,n.cpu,do.eval){
   #Create log file
   sink(paste0(wd,"/log.txt"))
   on.exit(sink())
-
+  
   #Load Functions
   library(devtools)
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/preModelingFunctions.R")
@@ -12,7 +12,7 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
   source_url("https://raw.githubusercontent.com/LBAB-Humboldt/parallelMaxent/master/postModelingFunctions.R")
   LoadLibraries()
   cat(paste(Sys.time(), "Functions and libraries loaded\n"))
-
+  
   #Load and clean data
   occs <- LoadOccs(occ.file)
   current.spp <- length(unique(occs$species))
@@ -35,9 +35,9 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
   current.recs <- nrow(occs)
   cat(paste(Sys.time(), "After removing  points within",dist, "meters of each other, ",
             current.recs, "records corresponding to", current.spp, "species remain\n"))
-
-
-
+  
+  
+  
   #Extract covariate data for presences (and background if bkg.aoi="extent")
   occs.covs <- extract(env.vars, cbind(occs$lon,occs$lat))
   nna.rows <- which(apply(!is.na(occs.covs), 1, any))
@@ -49,7 +49,7 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
     test.bkg <- GenerateBkg(n.bkg, env.vars, bkg.type, sample.bkg)
     cat(paste(Sys.time(), "Background generated for raster extent using",bkg.type, "sampling \n"))
   }
-
+  
   ## Define list of species with more than 10 records
   sp.list <- FilterSpeciesByRecords(occs, 10)
   if(length(sp.list)==0){
@@ -70,6 +70,7 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
     tmp.dir <- tempdir()
     sink(paste0(wd,"/log.txt"), append=TRUE)
     on.exit(sink())
+    
     LoadLibraries()
     #Get species data
     sp.name <- sp.list[i]
@@ -99,17 +100,8 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
     
     brt.obj <- gbm.step(data=df, gbm.x = 2:ncol(df), gbm.y = 1,
                         family = "bernoulli", tree.complexity = brt.params[1], 
-                        learning.rate = brt.params[2], bag.fraction = brt.params[3],prev.stratify=FALSE,
+                        learning.rate = min(sp.eval$lr), bag.fraction = brt.params[3],prev.stratify=FALSE,
                         site.weights=c(rep(1,length(sp.idx)), rep(length(sp.idx)/nrow(train.bkg), nrow(train.bkg))))
-    lr.tmp=brt.params[2]
-    while(is.null(brt.obj)){
-      lr.tmp=lr.tmp*0.5
-      brt.obj <- gbm.step(data=df, gbm.x = 2:ncol(df), gbm.y = 1,
-                          family = "bernoulli", tree.complexity = brt.params[1], 
-                          learning.rate = lr.tmp, bag.fraction = brt.params[3],prev.stratify=FALSE,
-                          site.weights=c(rep(1,length(sp.idx)), rep(length(sp.idx)/nrow(train.bkg), nrow(train.bkg))))
-    }
-    
     
     save(brt.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
     cat(paste(Sys.time(), "Generated BRT distribution model for", sp.name, "\n"))

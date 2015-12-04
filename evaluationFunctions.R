@@ -156,9 +156,9 @@ EvaluateBRTModel<-function(folds, covs.pres, covs.bkg.train, covs.bkg.test,brt.p
   results<-data.frame(n.train=rep(0,folds), n.test=0, ntrees=0, lr=brt.params[2], train.auc=0,
                       test.auc=0, stringsAsFactors=FALSE)
   kvector <- kfold(covs.pres, folds)
-  
+  lr.tmp=brt.params[2]
   for (k in 1:folds){
-    lr.tmp=brt.params[2]
+    print(paste0("Starting with learning rate ",lr.tmp))
     n.train <- length(which(kvector!=k))
     n.test <- length(which(kvector==k))
     train.df <- rbind(covs.pres[kvector!=k, ], covs.bkg.train)
@@ -175,6 +175,7 @@ EvaluateBRTModel<-function(folds, covs.pres, covs.bkg.train, covs.bkg.test,brt.p
     
     while(is.null(brt.obj)){
       lr.tmp=lr.tmp*0.5
+      print(paste0("\nTrying learning rate ",lr.tmp))
       brt.obj <- gbm.step(data=df, gbm.x = 2:ncol(df), gbm.y = 1,
                           family = "bernoulli", tree.complexity = brt.params[1], 
                           learning.rate = lr.tmp, bag.fraction = brt.params[3],prev.stratify=FALSE,
@@ -191,6 +192,7 @@ EvaluateBRTModel<-function(folds, covs.pres, covs.bkg.train, covs.bkg.test,brt.p
   }
   return(results)
 }
+
 
 #EvaluateBioclimModel
 EvaluateBioclimModel<-function(folds, covs.pres, covs.bkg.train, covs.bkg.test){
