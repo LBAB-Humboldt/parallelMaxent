@@ -10,6 +10,7 @@
 
 LoadLibraries<-function(memory="4g"){
   options(java.parameters = paste0("-Xmx",memory))
+  require("gbm")
   require("devtools")
   require("dismo")
   require("maptools")
