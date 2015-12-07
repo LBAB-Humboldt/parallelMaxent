@@ -134,7 +134,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
   }
   
   ## Define list of species with more than 10 records
-  sp.list <- FilterSpeciesByRecords(occs, 5)
+  sp.list <- FilterSpeciesByRecords(occs, 10)
   if(length(sp.list)==0){
     return()
   }
