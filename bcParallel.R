@@ -158,22 +158,22 @@ bcParallel <- function(occ.file, env.dir, env.files, dist, bkg.aoi, bkg.type,
     #Do model evaluation
     if(do.eval){
       sp.eval <- EvaluateBioclimModel(folds, covs.pres=occs.covs[sp.idx, ], covs.bkg.train=train.bkg, covs.bkg.test=test.bkg)
-      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation.csv"), row.names=F)
+      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation_bc.csv"), row.names=F)
       cat(paste(Sys.time(), "Performed model evaluation for", sp.name, "\n")) 
     }
     
     #Start modeling
     bc.obj <- bioclim(occs.covs[sp.idx, ])
       
-    save(bc.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
+    save(bc.obj, file=paste0(wd, "/", sp.list[i], "_bc.RData"))
     cat(paste(Sys.time(), "Generated Bioclim distribution model for", sp.name, "\n"))
     map <- predict(env.vars, bc.obj)
     
-    writeRaster(map, paste0(wd, "/", sp.list[i], ".tif"), format="GTiff",
+    writeRaster(map, paste0(wd, "/", sp.list[i], "_bc.tif"), format="GTiff",
                 overwrite=TRUE, NAflag=-9999)
     cat(paste(Sys.time(), "Generated prediction of maxent distribution model for", sp.name, "\n"))
     
-    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], ".csv"), row.names=FALSE)
+    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], "_bc.csv"), row.names=FALSE)
     
     #Post-processing: threshold & cut
     if(do.threshold){

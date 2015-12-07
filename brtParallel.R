@@ -91,7 +91,7 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
     #Do model evaluation
     if(do.eval){
       sp.eval <- EvaluateBRTModel(folds, covs.pres=occs.covs[sp.idx, ], covs.bkg.train=train.bkg, covs.bkg.test=test.bkg, brt.params)
-      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation.csv"), row.names=F)
+      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation_brt.csv"), row.names=F)
       cat(paste(Sys.time(), "Performed model evaluation for", sp.name, "\n")) 
     }
     
@@ -103,22 +103,22 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
                         learning.rate = min(sp.eval$lr), bag.fraction = brt.params[3],prev.stratify=FALSE,
                         site.weights=c(rep(1,length(sp.idx)), rep(length(sp.idx)/nrow(train.bkg), nrow(train.bkg))))
     
-    save(brt.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
+    save(brt.obj, file=paste0(wd, "/", sp.list[i], "_brt.RData"))
     cat(paste(Sys.time(), "Generated BRT distribution model for", sp.name, "\n"))
     map <- predict(env.vars, brt.obj, n.trees=brt.obj$gbm.call$best.trees, type="response")
     
-    writeRaster(map, paste0(wd, "/", sp.list[i], ".tif"), format="GTiff",
+    writeRaster(map, paste0(wd, "/", sp.list[i], "_brt.tif"), format="GTiff",
                 overwrite=TRUE, NAflag=-9999)
     cat(paste(Sys.time(), "Generated prediction of BRT distribution model for", sp.name, "\n"))
     
-    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], ".csv"), row.names=FALSE)
+    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], "_brt.csv"), row.names=FALSE)
     
     #Post-processing: threshold & cut
     if(do.threshold){
       thres.maps <- sapply(raw.threshold, FUN=ThresholdBRT, brt.obj=brt.obj, sp.covs=occs.covs[sp.idx, ],
                            map=map)
       for(j in 1:length(raw.threshold)){
-        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], ".tif"), 
+        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], "_brt.tif"), 
                     format="GTiff",overwrite=TRUE, NAflag=-9999)
       }
       cat(paste(Sys.time(), "Generated thresholded prediction of BRT distribution model
@@ -126,7 +126,7 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
       if(do.cut){
         cut.maps <- sapply(thres.maps, FUN=CutModel2, sp.points=cbind(sp.occs$lon,sp.occs$lat))
         for(j in 1:length(raw.threshold)){
-          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut.tif"), 
+          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut_brt.tif"), 
                       format="GTiff",overwrite=TRUE, NAflag=-9999)
         }
         cat(paste(Sys.time(), "Cut thresholded prediction(s) of BRT distribution model for", sp.name, "\n"))

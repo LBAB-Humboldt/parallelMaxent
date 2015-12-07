@@ -188,7 +188,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     #Do model evaluation
     if(do.eval){
       sp.eval <- EvaluatePOModel(folds, occs.covs[sp.idx, ], train.bkg, test.bkg, mxnt.args, path=tmp.dir)
-      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation.csv"), row.names=F)
+      write.csv(sp.eval, paste0(wd, "/", sp.list[i],"_evaluation_mx.csv"), row.names=F)
       cat(paste(Sys.time(), "Performed model evaluation for", sp.name, "\n")) 
     }
     
@@ -196,15 +196,15 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
     mxnt.obj <- maxent(x=rbind(occs.covs[sp.idx, ], train.bkg), 
                      p=c(rep(1,length(sp.idx)),rep(0,nrow(train.bkg))),
                      removeDuplicates=FALSE, args=mxnt.args, path=tmp.dir)
-    save(mxnt.obj, file=paste0(wd, "/", sp.list[i], ".RData"))
+    save(mxnt.obj, file=paste0(wd, "/", sp.list[i], "_mx.RData"))
     cat(paste(Sys.time(), "Generated maxent distribution model for", sp.name, "\n"))
     
     map <- predict(mxnt.obj, env.vars ,args=c("outputformat=logistic")) 
-    writeRaster(map, paste0(wd, "/", sp.list[i], ".tif"), format="GTiff",
+    writeRaster(map, paste0(wd, "/", sp.list[i], "_mx.tif"), format="GTiff",
                 overwrite=TRUE, NAflag=-9999)
     cat(paste(Sys.time(), "Generated prediction of maxent distribution model for", sp.name, "\n"))
     
-    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], ".csv"), row.names=FALSE)
+    write.csv(occs[sp.idx, ], paste0(wd, "/", sp.list[i], "_mx.csv"), row.names=FALSE)
     #Note to self: Other stuff to write? results?
     
     #Post-processing: threshold & cut
@@ -212,7 +212,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
       thres.maps <- sapply(raw.threshold, FUN=Threshold2, mxnt.obj=mxnt.obj, 
                                  map=map)
       for(j in 1:length(raw.threshold)){
-        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], ".tif"), 
+        writeRaster(thres.maps[[j]],filename=paste0(wd, "/", sp.name,"_", raw.threshold[j], "_mx.tif"), 
                     format="GTiff",overwrite=TRUE, NAflag=-9999)
       }
       cat(paste(Sys.time(), "Generated thresholded prediction of maxent distribution model
@@ -220,7 +220,7 @@ mxParallel<-function(occ.file,env.dir,env.files,wd=getwd(),dist=1000,bkg.aoi = "
       if(do.cut){
         cut.maps <- sapply(thres.maps, FUN=CutModel2, sp.points=cbind(sp.occs$lon,sp.occs$lat))
         for(j in 1:length(raw.threshold)){
-          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut.tif"), 
+          writeRaster(cut.maps[[j]],filename=paste0(wd, "/", sp.name,"_",raw.threshold[j], "_cut_mx.tif"), 
                       format="GTiff",overwrite=TRUE, NAflag=-9999)
         }
         cat(paste(Sys.time(), "Cut thresholded prediction(s) of maxent distribution model for", sp.name, "\n"))
