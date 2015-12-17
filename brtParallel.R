@@ -136,4 +136,5 @@ brtParallel<-function(occ.file,env.dir,env.files,dist=1000,bkg.aoi,bkg.type,
     #Remove temporary files
     removeTmpFiles(2)
   })
+  sfStop()
 }
